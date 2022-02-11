@@ -1,24 +1,45 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import logo from "./logo.svg";
+import "./App.css";
+import { useAction, useObservableHook, useStore } from "./store/store";
+import { PokemonURL } from "./model/pokemon.model";
+import Pokemons from "./components/pokemonUrls";
+import PokemonModels from "./components/pokemonModels";
 
 function App() {
+  const store = useStore();
+  const action = useAction();
+  const counter = useObservableHook(store.counter$);
+  const page = useObservableHook(store.page$);
+  const pokemonModels = useObservableHook(store.pokemonModels$);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div>counter: {counter}</div>
+      <div>
+        <button
+          onClick={() => {
+            action.increaseCounter(10);
+          }}
         >
-          Learn React
-        </a>
-      </header>
+          increase
+        </button>
+        <button
+          onClick={() => {
+            action.decreaseCounter(10);
+          }}
+        >
+          decrease
+        </button>
+      </div>
+      <div>page: {page}</div>
+      <div>
+        <button onClick={() => action.prevPage()}>prevPage</button>
+        <button onClick={() => action.nextPage()}>nextPage</button>
+      </div>
+      <div style={{ display: "flex" }}>
+        <PokemonModels pokemons={pokemonModels}></PokemonModels>
+      </div>
     </div>
   );
 }
