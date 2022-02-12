@@ -4,10 +4,12 @@ import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { StoreProvider } from "./store/store";
+import LoadSpinner from "./components/load-spinner";
 
 ReactDOM.render(
   <React.StrictMode>
     <StoreProvider>
+      <LoadSpinner></LoadSpinner>
       <App />
     </StoreProvider>
   </React.StrictMode>,

@@ -1,35 +1,34 @@
 import * as React from "react";
 import {
   BehaviorSubject,
+  catchError,
   combineLatest,
   debounceTime,
   distinctUntilChanged,
-  from,
+  EMPTY,
+  filter,
+  finalize,
   map,
-  mergeAll,
+  mapTo,
+  merge,
   Observable,
   shareReplay,
   Subject,
   switchMap,
   tap,
-  toArray,
 } from "rxjs";
-import { httpGet } from "../http/http";
-import {
-  PokemonModel,
-  PokemonPageResponse,
-  PokemonURL,
-} from "../model/pokemon.model";
+import { getPokemonByPaginator, getPokemonModels } from "../http/http-pokemon";
+import { PokemonModel, PokemonURL } from "../model/pokemon.model";
 
 interface IStoreProviderProps {}
 
 interface AppState {
-  counter: number;
   limit: number;
   offset: number;
   page: number;
   pokemonUrls: PokemonURL[];
   pokemons: PokemonModel[];
+  loading: boolean;
 }
 
 // --- Action ---
@@ -40,23 +39,26 @@ const setPokemonUrlsAction = new Subject<{ pokemons: PokemonURL[] }>();
 const setPokemonModelsAction = new Subject<{ pokemons: any[] }>();
 const nextPageAction = new Subject<void>();
 const prevPageAction = new Subject<void>();
+const showLoadingAction = new Subject<void>();
+const hideLoadingAction = new Subject<void>();
+const setLoadingAction = new Subject<boolean>();
 
 const state = new BehaviorSubject<AppState>({
-  counter: 0,
   limit: 10,
   offset: 0,
   page: 1,
   pokemonUrls: [],
   pokemons: [],
+  loading: false,
 });
 
 const store = {
-  counter$: createSelector((state) => state.counter),
   page$: createSelector((state) => state.page),
   limit$: createSelector((state) => state.limit),
   offset$: createSelector((state) => state.offset),
   pokemonUrls$: createSelector((state) => state.pokemonUrls),
   pokemonModels$: createSelector((state) => state.pokemons),
+  loading$: createSelector((state) => state.loading),
 };
 
 const action = {
@@ -72,18 +74,22 @@ const action = {
   prevPage: () => {
     prevPageAction.next();
   },
+  rxShowLoading: <T,>() => {
+    return (source: Observable<T>) =>
+      new Observable<T>((observer) => {
+        showLoadingAction.next();
+        return source
+          .pipe(
+            finalize(() => {
+              hideLoadingAction.next();
+            })
+          )
+          .subscribe(observer);
+      });
+  },
 };
 
 // --- Reducer ---
-createReducer(increaseCounterAction, (state, action) => {
-  state.counter += action.value;
-  return state;
-});
-
-createReducer(decreaseCounterAction, (state, action) => {
-  state.counter -= action.value;
-  return state;
-});
 
 createReducer(nextPageAction, (state, action) => {
   state.offset += state.limit;
@@ -107,25 +113,36 @@ createReducer(setPokemonModelsAction, (state, action) => {
   return state;
 });
 
+createReducer(setLoadingAction, (state, loading) => {
+  state.loading = loading;
+  return state;
+});
+
 // --- Effect ---
 
 createEffect(
+  combineLoading(showLoadingAction, hideLoadingAction).pipe(
+    tap((loading) => {
+      setLoadingAction.next(loading);
+    })
+  )
+);
+
+createEffect(
   combineLatest([store.limit$, store.offset$]).pipe(
-    debounceTime(0),
+    debounceTime(300),
     switchMap(([limit, offset]) => {
-      return httpGet<PokemonPageResponse>(
-        `https://pokeapi.co/api/v2/pokemon?limit=${limit}&offset=${offset}`
-      ).pipe(
+      return getPokemonByPaginator(limit, offset).pipe(
+        action.rxShowLoading(),
         tap((response) => {
           setPokemonUrlsAction.next({ pokemons: response.results });
-        })
+        }),
+        catchError((err) => EMPTY)
       );
     }),
     switchMap((response) => {
-      return from(response.results).pipe(
-        map((result) => httpGet(result.url)),
-        mergeAll(),
-        toArray(),
+      return getPokemonModels(response.results).pipe(
+        action.rxShowLoading(),
         tap((response) => {
           setPokemonModelsAction.next({ pokemons: response });
         })
@@ -203,4 +220,25 @@ export function useObservableHook<T, R extends T>(
 
 function calPage(limit: number, offset: number) {
   return (offset + limit) / limit;
+}
+
+function combineLoading(
+  showLoading$: Observable<void>,
+  hideLoading$: Observable<void>
+) {
+  let show = 0;
+  const show$ = showLoading$.pipe(
+    tap(() => {
+      show++;
+    }),
+    mapTo(true)
+  );
+  const hide$ = hideLoading$.pipe(
+    tap(() => {
+      show--;
+    }),
+    filter(() => show === 0),
+    mapTo(false)
+  );
+  return merge(show$, hide$).pipe(distinctUntilChanged());
 }
