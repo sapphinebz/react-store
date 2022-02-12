@@ -10,7 +10,7 @@ const PokemonModels: React.FunctionComponent<IPokemonModelsProps> = React.memo(
     const pokemonNodes = React.useMemo(() => {
       const pokemons = props.pokemons || [];
       return pokemons.map((p) => (
-        <div>
+        <div key={p.name}>
           <div>{p.name}</div>
           <div>
             <img src={p.sprites.front_default} alt={p.name} />
