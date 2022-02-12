@@ -3,7 +3,9 @@ import {
   BehaviorSubject,
   catchError,
   combineLatest,
+  combineLatestWith,
   debounceTime,
+  delay,
   distinctUntilChanged,
   EMPTY,
   filter,
@@ -26,6 +28,7 @@ interface AppState {
   limit: number;
   offset: number;
   page: number;
+  totalPage: number | null;
   pokemonUrls: PokemonURL[];
   pokemons: PokemonModel[];
   loading: boolean;
@@ -42,22 +45,28 @@ const prevPageAction = new Subject<void>();
 const showLoadingAction = new Subject<void>();
 const hideLoadingAction = new Subject<void>();
 const setLoadingAction = new Subject<boolean>();
+const setTotalPageAction = new Subject<{ total: number }>();
+const setPokemonCountAction = new Subject<{ count: number }>();
 
 const state = new BehaviorSubject<AppState>({
   limit: 10,
   offset: 0,
   page: 1,
+  totalPage: null,
   pokemonUrls: [],
   pokemons: [],
   loading: false,
 });
 
 const store = {
-  page$: createSelector((state) => state.page),
-  limit$: createSelector((state) => state.limit),
-  offset$: createSelector((state) => state.offset),
-  pokemonUrls$: createSelector((state) => state.pokemonUrls),
-  pokemonModels$: createSelector((state) => state.pokemons),
+  pokemon: {
+    page$: createSelector((state) => state.page),
+    limit$: createSelector((state) => state.limit),
+    offset$: createSelector((state) => state.offset),
+    totalPage$: createSelector((state) => state.totalPage),
+    pokemonUrls$: createSelector((state) => state.pokemonUrls),
+    pokemonModels$: createSelector((state) => state.pokemons),
+  },
   loading$: createSelector((state) => state.loading),
 };
 
@@ -98,8 +107,11 @@ createReducer(nextPageAction, (state, action) => {
 });
 
 createReducer(prevPageAction, (state, action) => {
-  state.offset -= state.limit;
-  state.page = calPage(state.limit, state.offset);
+  const newOffset = state.offset - state.limit;
+  if (newOffset >= 0) {
+    state.offset = newOffset;
+    state.page = calPage(state.limit, state.offset);
+  }
   return state;
 });
 
@@ -118,7 +130,23 @@ createReducer(setLoadingAction, (state, loading) => {
   return state;
 });
 
+createReducer(setTotalPageAction, (state, action) => {
+  state.totalPage = action.total;
+  return state;
+});
+
 // --- Effect ---
+
+createEffect(
+  setPokemonCountAction.pipe(
+    combineLatestWith(store.pokemon.limit$),
+    debounceTime(0),
+    tap(([action, limit]) => {
+      const totalPage = Math.ceil(action.count / limit);
+      setTotalPageAction.next({ total: totalPage });
+    })
+  )
+);
 
 createEffect(
   combineLoading(showLoadingAction, hideLoadingAction).pipe(
@@ -129,12 +157,13 @@ createEffect(
 );
 
 createEffect(
-  combineLatest([store.limit$, store.offset$]).pipe(
+  combineLatest([store.pokemon.limit$, store.pokemon.offset$]).pipe(
     debounceTime(300),
     switchMap(([limit, offset]) => {
       return getPokemonByPaginator(limit, offset).pipe(
         action.rxShowLoading(),
         tap((response) => {
+          setPokemonCountAction.next({ count: response.count });
           setPokemonUrlsAction.next({ pokemons: response.results });
         }),
         catchError((err) => EMPTY)
@@ -238,6 +267,7 @@ function combineLoading(
       show--;
     }),
     filter(() => show === 0),
+    delay(300),
     mapTo(false)
   );
   return merge(show$, hide$).pipe(distinctUntilChanged());

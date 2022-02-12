@@ -1,17 +1,21 @@
+import { useObservableState } from "observable-hooks";
 import React from "react";
 import "./App.css";
 import PokemonModels from "./components/pokemon-models";
-import { useAction, useObservableHook, useStore } from "./store/store";
+import { useAction, useStore } from "./store/store";
 
 function App() {
   const store = useStore();
   const action = useAction();
-  const page = useObservableHook(store.page$);
-  const pokemonModels = useObservableHook(store.pokemonModels$);
+  const page = useObservableState(store.pokemon.page$);
+  const totalPage = useObservableState(store.pokemon.totalPage$);
+  const pokemonModels = useObservableState(store.pokemon.pokemonModels$);
 
   return (
     <div className="App">
-      <div>page: {page}</div>
+      <div>
+        page: {page} / {totalPage}
+      </div>
       <div>
         <button onClick={() => action.prevPage()}>prevPage</button>
         <button onClick={() => action.nextPage()}>nextPage</button>
