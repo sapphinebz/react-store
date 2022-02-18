@@ -149,7 +149,7 @@ createEffect(
 );
 
 createEffect(
-  combineLoading(showLoadingAction, hideLoadingAction).pipe(
+  createObservableLoading(showLoadingAction, hideLoadingAction).pipe(
     tap((loading) => {
       setLoadingAction.next(loading);
     })
@@ -227,15 +227,15 @@ export function useStore() {
   return React.useContext(StoreContext);
 }
 
-export function useObservableHook<T, R = undefined>(
-  source: Observable<T>,
-  defaultValue?: R
-): T | R;
-export function useObservableHook<T, R extends T>(
-  source: Observable<T>,
-  defaultValue: R
-): T | R {
-  const [_state, _setState] = React.useState<T | R>(defaultValue);
+export function useObservableState<TState>(
+  source: Observable<TState>,
+  defaultValue?: TState
+): TState;
+export function useObservableState<TState = undefined>(
+  source: Observable<TState>
+): TState | undefined {
+  const defaultValue = arguments[1];
+  const [_state, _setState] = React.useState<TState>(defaultValue);
   React.useEffect(() => {
     const subscription = source.subscribe((value) => {
       _setState(value);
@@ -251,7 +251,7 @@ function calPage(limit: number, offset: number) {
   return (offset + limit) / limit;
 }
 
-function combineLoading(
+function createObservableLoading(
   showLoading$: Observable<void>,
   hideLoading$: Observable<void>
 ) {

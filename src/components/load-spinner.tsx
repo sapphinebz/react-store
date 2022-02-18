@@ -1,12 +1,12 @@
 import * as React from "react";
-import { useObservableHook, useStore } from "../store/store";
+import { useObservableState, useStore } from "../store/store";
 import "./load-spinner.css";
 interface ILoadSpinnerProps {}
 
 const LoadSpinner: React.FunctionComponent<ILoadSpinnerProps> = React.memo(
   (props) => {
     const store = useStore();
-    const loading = useObservableHook(store.loading$);
+    const loading = useObservableState(store.loading$);
     const LoadingNode = React.useMemo(() => {
       if (loading) {
         return (

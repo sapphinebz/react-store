@@ -1,15 +1,14 @@
-import { useObservableState } from "observable-hooks";
 import React from "react";
 import "./App.css";
 import PokemonModels from "./components/pokemon-models";
-import { useAction, useStore } from "./store/store";
+import { useAction, useObservableState, useStore } from "./store/store";
 
 function App() {
   const store = useStore();
   const action = useAction();
   const page = useObservableState(store.pokemon.page$);
   const totalPage = useObservableState(store.pokemon.totalPage$);
-  const pokemonModels = useObservableState(store.pokemon.pokemonModels$);
+  const pokemonModels = useObservableState(store.pokemon.pokemonModels$, []);
 
   return (
     <div className="App">
